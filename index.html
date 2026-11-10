@@ -128,16 +128,16 @@ function load(){try{var r=localStorage.getItem(KEY);S=r?JSON.parse(r):fresh()}ca
 function save(){checkAch();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function daysDiff(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5)}
 function rollover(){var L=[],hp=0,xp=0;if(S.pro===undefined&&S.init)S.pro=1;S.gems=S.gems||0;S.pity=S.pity||0;S.rewards=S.rewards||[];S.rewards.forEach(function(r){if(r.price===undefined){r.price=Math.max(10,(r.lv||1)*10);r.cnt=r.claimed?1:0}});S.dungeons=S.dungeons||[];S.habits.forEach(function(h){delete h.link});S.dungeons.forEach(function(d){if(d.goal)delete d.goal.m});
- S.habits.forEach(function(h){if(h.last&&h.last<Y){if(covered(h.last)){h.last=Y}else if(S.sage&&S.sage.lv>1&&h.streak>=3&&(!S.shieldAt||daysDiff(S.shieldAt,T)>=7)){S.shieldAt=T;h.last=Y;toast('[系統] 詠唱破棄：已保護「'+h.name+'」的連續天數')}else h.streak=0}
+ S.habits.forEach(function(h){if(h.last&&h.last<Y&&brokeFrom(h,h.last)){if(S.sage&&S.sage.lv>1&&h.streak>=3&&(!S.shieldAt||daysDiff(S.shieldAt,T)>=7)){S.shieldAt=T;h.last=Y;toast('[系統] 詠唱破棄：已保護「'+h.name+'」的連續天數')}else h.streak=0}
   if(S.hard&&h.type==='good'){var b=h.last||h.start||S.day;if(h.pen&&h.pen>b)b=h.pen;
-   var m=Math.min(3,Math.max(0,daysDiff(b,Y)-sdCount(b,Y)));if(m>0){hp+=10*m;xp+=Math.ceil(h.xp/2)*m;L.push(h.name+'：漏做 '+m+' 天')}}
+   var m=Math.min(3,missCnt(h,b));if(m>0){hp+=10*m;xp+=Math.ceil(h.xp/2)*m;L.push(h.name+'：漏做 '+m+' 天')}}
   h.pen=Y});
  if(S.day!==T){S.hp=Math.min(100,S.hp+10+eff().rg+(sk('s2')?5:0));poison()}
  dExpire();sageWarn();S.day=T;
  if(hp){S.hp-=hp;S.xp=Math.max(0,S.xp-xp);var nd=nearDeath();if(nd===1)L.push('不屈意志發動：免於瀕死，HP 回復至 30');else if(nd===2)L.push('瀕死：本級經驗歸零，HP 回復至 50');ovq.push({k:'pen',L:L,hp:hp,xp:xp})}
  save()}
 function tick(){if(ds()!==T){T=ds();Y=ds(new Date(Date.now()-864e5));rollover();render();flush();return}updateCd()}
-function nOpen(){return S.habits.filter(function(h){return !done(h)&&h.type==='good'}).length}
+function nOpen(){return S.habits.filter(function(h){return !done(h)&&h.type==='good'&&dueToday(h)}).length}
 function updateCd(){var n=new Date(),e=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1),s=Math.floor((e-n)/1000),t=z(Math.floor(s/3600))+':'+z(Math.floor(s%3600/60))+':'+z(s%60),op=nOpen();
  document.querySelectorAll('.cd').forEach(function(x){x.textContent='距離截止 '+t;x.style.color=(s<10800&&op)?'var(--red)':'var(--glow)'})}
 function cdBox(){return'<div class="win"><div class="ttl"><span>[ 今日截止 ]</span><span class="cd"></span></div><div class="sub" style="margin:0">尚有 '+nOpen()+' 項好習慣未完成。'+(S.hard?'困難模式：漏做會自動扣 HP 與 XP。':'午夜過後未完成，連續天數會中斷。')+'</div></div>'}
@@ -151,7 +151,7 @@ function qz(){var q=QS[QZ.i];$('#ov').innerHTML='<div class="ov"><div class="win
 function pick(k){var q=QS[QZ.i];if(q.m){var p=QZ.sel.indexOf(k);if(p>-1)QZ.sel.splice(p,1);else if(QZ.sel.length<3)QZ.sel.push(k);qz()}else{QZ.a.push([k]);QZ.i++;QZ.sel=[];if(QZ.i<QS.length)qz();else finishQ()}}
 function nextQ(){if(!QZ.sel.length){toast('請至少選 1 項',true);return}QZ.a.push(QZ.sel.slice());QZ.i++;QZ.sel=[];if(QZ.i<QS.length)qz();else finishQ()}
 function skipQ(){S.init=true;save();closeOv()}
-function exportData(){var j=JSON.stringify(S,function(k,v){return k==='undo'?undefined:v});$('#ov').innerHTML='<div class="ov"><div class="win"><div class="ttl">[ 匯出備份 ]</div><div class="sub" style="margin:0 0 8px;text-align:left">複製這段文字，貼到備忘錄或傳給自己保存。換裝置或重裝時用「匯入備份」還原。</div><textarea id="bk" readonly>'+esc(j)+'</textarea><div class="btns" style="justify-content:center"><button class="b" onclick="copyBk()">複製</button><button class="b" id="shb" onclick="shareBk()">分享</button><button class="b x" style="margin-left:0" onclick="closeOv()">關閉</button></div></div></div>';if(!navigator.share)$('#shb').style.display='none'}
+function exportData(){var j=JSON.stringify(S,function(k,v){return k==='undo'?undefined:v});S.bk=Date.now();save();$('#ov').innerHTML='<div class="ov"><div class="win"><div class="ttl">[ 匯出備份 ]</div><div class="sub" style="margin:0 0 8px;text-align:left">複製這段文字，貼到備忘錄或傳給自己保存。換裝置或重裝時用「匯入備份」還原。</div><textarea id="bk" readonly>'+esc(j)+'</textarea><div class="btns" style="justify-content:center"><button class="b" onclick="copyBk()">複製</button><button class="b" id="shb" onclick="shareBk()">分享</button><button class="b x" style="margin-left:0" onclick="closeOv()">關閉</button></div></div></div>';if(!navigator.share)$('#shb').style.display='none'}
 function copyBk(){var t=$('#bk');t.focus();t.select();t.setSelectionRange(0,t.value.length);var ok=false;try{ok=document.execCommand('copy')}catch(e){}
  if(navigator.clipboard&&!ok){navigator.clipboard.writeText(t.value).then(function(){toast('[系統] 已複製備份')},function(){toast('請長按文字手動複製',true)});return}
  toast(ok?'[系統] 已複製備份':'請長按文字手動複製',!ok)}
@@ -194,7 +194,7 @@ function openVal(id){$('#ov').innerHTML='<div class="ov"><div class="win"><div c
 function setVal(id){var d=S.dungeons.find(function(x){return x.id===id}),v=parseFloat($('#bv').value);if(!d||isNaN(v))return;d.goal.c=v;save();if(prog(d)>=1)clearD(d);closeOv()}
 function delD(id){if(confirmId!==id){confirmId=id;render();return}S.dungeons=S.dungeons.filter(function(x){return x.id!==id});confirmId=null;save();render()}
 function hit(x){var c=[],dm=dmgM();S.dungeons.forEach(function(d){if(d.type==='boss'||d.objs)return;d.hp=Math.max(0,d.hp-x*(sk('s5')?1.2:1)*(S.pred&&S.pred.lv>1?1.25:1)*dm*spec(d.type));if(d.hp<=0)c.push(d)});c.forEach(clearD)}
-function clearD(d){S.clr=(S.clr||0)+1;S.dungeons=S.dungeons.filter(function(x){return x.id!==d.id});var r=d.rank,gm=Math.round([10,20,40,80,150,300][r]*(d.type==='boss'?1.5:1)*(eq('lord')?1.3:1)*(d.type==='boss'?specB():1)),xp=gain([30,60,120,200,350,600][r]);S.gems+=gm;
+function clearD(d){S.clr=(S.clr||0)+1;if(S.clr===1&&S.lv<3)toast('[系統] 已解鎖「暗影」與「寶庫」分頁');S.dungeons=S.dungeons.filter(function(x){return x.id!==d.id});var r=d.rank,gm=Math.round([10,20,40,80,150,300][r]*(d.type==='boss'?1.5:1)*(eq('lord')?1.3:1)*(d.type==='boss'?specB():1)),xp=gain([30,60,120,200,350,600][r]);S.gems+=gm;
  var n=1+(r>=2?1:0)+(r>=4?1:0)+(d.type==='boss'?1:0),it=[];for(var i=0;i<n;i++)it.push(loot(pickR(W[r])));
  var mn=d.mon||rnd(MON[r]),ch=Math.min(1,(d.type==='boss'?1:d.type==='tower'?.6:.7)+(sk('s6')?.2:0)+eff().ext),ex;
  if(Math.random()<ch){var mr=[0,0,1,1,2,3][r];S.legion=S.legion||[];S.legion.push({n:mn,r:mr});ex='<img class="ovi" src="'+monImg(mn,mr)+'" alt=""><div class="big glitch" style="font-size:30px;margin-top:10px">ARISE</div><div class="it r'+mr+'">暗影收編：'+esc(mn)+'（'+RN[mr]+'）</div>'}
@@ -279,7 +279,7 @@ function importHealth(){var a=$('#hv').value.trim().split('|');if(a[0]!=='HEALTH
  save();closeOv();toast('[系統] 已同步健康資料，自動完成 '+n+' 個任務')}
 var qf='todo';
 function setQf(v){qf=v;render()}
-function qseg(){var n=S.habits.filter(done).length,m=S.habits.length-n;return'<div class="seg" style="margin-bottom:12px"><button class="b'+(qf==='todo'?' sel':'')+'" onclick="setQf(\'todo\')">待辦事項 '+m+'</button><button class="b'+(qf==='done'?' sel':'')+'" onclick="setQf(\'done\')">已完成 '+n+'</button></div>'}
+function qseg(){var n=S.habits.filter(done).length,m=S.habits.filter(function(x){return dueToday(x)&&!done(x)}).length;return'<div class="seg" style="margin-bottom:12px"><button class="b'+(qf==='todo'?' sel':'')+'" onclick="setQf(\'todo\')">待辦事項 '+m+'</button><button class="b'+(qf==='done'?' sel':'')+'" onclick="setQf(\'done\')">已完成 '+n+'</button></div>'}
 function applyTheme(){document.documentElement.setAttribute('data-th',S.theme==='b'?'':'o')}
 function toggleTheme(){S.theme=S.theme==='b'?'o':'b';applyTheme();save();render()}
 function confetti(){if(navigator.vibrate)navigator.vibrate(80);if(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;var c=document.createElement('div');c.className='cfw';var cl=['#4da3ff','#9a5cff','#ffc857','#ff6a00','#fff'];for(var i=0;i<46;i++){var s=document.createElement('i');s.style.cssText='left:'+Math.random()*100+'%;background:'+cl[i%5]+';animation-delay:'+Math.random()*.5+'s;--dx:'+(Math.random()*160-80)+'px;--r:'+Math.random()*720+'deg';c.appendChild(s)}document.body.appendChild(c);setTimeout(function(){c.remove()},3200)}
@@ -315,11 +315,11 @@ function recView(){var G=S.goals||[],c=G.filter(function(g){return !S.dungeons.s
 function openRec(gi){var g=(S.goals||[]).find(function(x){return x.gi===gi});if(g){gateFrom(gi,g.hid);render()}}
 function finishQ(){var a=QZ.a,i3=a[2][0],m=[10,20,30][i3],xp=[15,30,50][i3],sl=a[0][0]===0?'23:00':'00:00',names=[],ch=[];S.goals=S.goals||[];
  a[1].slice(0,3).forEach(function(gi,j){var G=GL[gi],nm=G[3].replace('{m}',m).replace('{sl}',sl),h=S.habits.find(function(x){return x.name===nm});
-  if(!h){h={id:'h'+Date.now()+j,name:nm,type:G[2],stat:G[1],xp:xp,goal:21,streak:0,total:0,last:null,shadow:false,start:T,pen:Y,lt:LT[gi]};S.habits.push(h);names.push(nm)}
+  if(!h){h={id:'h'+Date.now()+j,name:nm,type:G[2],stat:G[1],xp:xp,goal:21,streak:0,total:0,last:null,shadow:false,start:T,pen:Y,lt:LT[gi],fq:(gi===1?{t:'n',n:4}:undefined),mn:(gi===1||gi===7)?m:(gi===0?25:undefined)};S.habits.push(h);names.push(nm)}
   if(!S.goals.some(function(g){return g.gi===gi}))S.goals.push({gi:gi,hid:h.id});
   if(!S.dungeons.some(function(d){return d.gk===gi})){gateFrom(gi,h.id);ch.push(G[4])}S.stats[G[1]]+=2});
  S.hard=a[3][0]===1;S.init=true;save();
- $('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl" style="justify-content:center">[ 覺醒完成 ]</div>'+evtHead('awaken')+'<div style="text-align:left;font-size:14px">'+names.map(function(t){return'<div>✔ 任務：'+esc(t)+'</div>'}).join('')+ch.map(function(t){return'<div>🌀 挑戰：'+esc(t)+'</div>'}).join('')+'</div><div class="sub">到「副本」分頁查看每個挑戰的目標與進度。'+(S.hard?'已選困難模式。':'')+'</div><div class="btns" style="justify-content:center"><button class="b" onclick="closeOv()">開始</button></div></div></div>'}
+ $('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl" style="justify-content:center">[ 覺醒完成 ]</div>'+evtHead('awaken')+'<div style="text-align:left;font-size:14px">'+names.map(function(t){return'<div>✔ 任務：'+esc(t)+'</div>'}).join('')+ch.map(function(t){return'<div>🌀 挑戰：'+esc(t)+'</div>'}).join('')+'</div><div class="sub">完成第一個任務後會解鎖「副本」分頁，可查看每個挑戰的目標與進度。'+(S.hard?'已選困難模式。':'')+'</div><div class="btns" style="justify-content:center"><button class="b" onclick="closeOv()">開始</button></div></div></div>'}
 function askReset(){$('#ov').innerHTML='<div class="ov"><div class="win" style="border-color:var(--red)"><div class="ttl" style="justify-content:center;color:var(--red)">[ 重做角色 ]</div><div class="sub">這會清除所有進度：等級、任務、暗影、裝備、成就、魂晶。主題設定會保留。此動作無法復原，建議先匯出備份。</div><div class="btns" style="justify-content:center"><button class="b" onclick="exportData()">先匯出備份</button><button class="b r" onclick="doReset()">確定重做</button><button class="b x" style="margin-left:0" onclick="closeOv()">取消</button></div></div></div>'}
 function doReset(){var th=S.theme;S=fresh();S.theme=th;S.init=false;rollover();save();ovq.push({k:'quiz'});showPro(0)}
 function shopView(){var R=S.rewards||[];return'<div class="win"><div class="ttl"><span>[ 現實獎勵商店 ]</span><span style="color:var(--gold)"><img class="gi" src="img/O06.jpg" alt="">魂晶 '+S.gems+'</span></div><div class="sub" style="margin:0 0 8px">替自己設定「現實中的獎勵」（例如一杯手搖飲、一場電影），訂下需要的魂晶。魂晶夠了就能兌換，兌換等於你允許自己去享受它。魂晶來自完成任務、通關副本和成就。</div><label>獎勵內容</label><input id="rn" maxlength="30" placeholder="例如：一杯手搖飲"><label>魂晶價格</label><input id="rp" type="number" min="1" value="50"><div class="btns"><button class="b" onclick="addR2()">加入商店</button></div></div>'
@@ -330,8 +330,8 @@ function avatar(sz){if(1)return'<img src="'+avSrc()+'" alt="頭像" style="width
  var rk=rankOf(S.lv),eye=(rk==='E'||rk==='D')?'#4da3ff':(rk==='C'||rk==='B')?'#b57cff':'#ffc857';
  return'<svg viewBox="0 0 100 100" width="'+sz+'" height="'+sz+'" style="border-radius:50%;background:radial-gradient(circle,#1c2a55,#05070f);border:2px solid var(--glow);box-shadow:0 0 14px var(--glow)"><path d="M16 66Q10 18 50 12Q90 18 84 66Q76 40 50 38Q24 40 16 66Z" fill="#141a2c"/><ellipse cx="50" cy="58" rx="23" ry="27" fill="#f2d3bd"/><path d="M26 54Q26 24 50 22Q74 24 74 54Q66 38 50 40Q34 38 26 54Z" fill="#141a2c"/><path d="M38 40L44 56L34 50Z M62 40L56 56L66 50Z" fill="#141a2c"/><ellipse cx="40" cy="60" rx="4" ry="6" fill="'+eye+'"/><ellipse cx="60" cy="60" rx="4" ry="6" fill="'+eye+'"/><path d="M45 74Q50 77 55 74" stroke="#a5674f" stroke-width="1.5" fill="none"/><path d="M26 98Q50 78 74 98Z" fill="#0b0f1e" stroke="'+eye+'" stroke-width="1.2"/></svg>'}
 function upAv(f){var fl=f.files&&f.files[0];if(!fl)return;var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var c=document.createElement('canvas'),s=Math.min(im.width,im.height);c.width=c.height=160;c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,160,160);S.avatar=c.toDataURL('image/jpeg',.82);save();closeOv()};im.src=r.result};r.readAsDataURL(fl)}
-var HELP={status:['狀態','這裡看你的等級、經驗、HP 與能力值。完成任務得 XP，經驗滿了就升級，每次升級得 5 點屬性點，按能力值旁的「＋」分配；五項屬性各有實際效果（見能力值下方說明）。「專屬技能」會隨努力進化；「君主領域」每週可展開一次，24 小時內加成；「潛影」每月 3 次請假，不中斷連續；困難模式漏做會自動受罰。點頭像可換成自己的圖片。請定期按「匯出備份」，「重做角色」會清除所有進度。'],
-quests:['任務','打卡位置就在這一頁：每個任務卡片下方按「完成」（壞習慣按「今天忍住了」）。每天至少打卡一個任務，全帳號的「連續打卡」天數就會增加。好習慣按「完成」；要戒除的壞習慣按「今天忍住了」，破戒了就按「破戒了」，會扣 HP 和 XP。難度決定 XP：簡單 15、中等 30、困難 50。每個任務有連續天數與目標天數，達標後可收編為暗影士兵（永久 XP 加成）。上方可切換「待辦事項」與「已完成」。忙碌時可按「低負擔：…」（只拿約 40% XP、沒有加成進度，但保住連續與紀錄）。誤按可在卡片按「撤銷」（只能撤銷最近一次）；編輯與刪除在卡片右下角的「⋯」選單。'],
+var HELP={status:['狀態','這裡看你的等級、經驗、HP 與能力值。完成任務得 XP，經驗滿了就升級，每次升級得 5 點屬性點，按能力值旁的「＋」分配；五項屬性各有實際效果（見能力值下方說明）。「專屬技能」會隨努力進化；「君主領域」每週可展開一次，24 小時內加成；「潛影」每月 3 次請假，不中斷連續；困難模式漏做會自動受罰。點頭像可換成自己的圖片。備份、主題、難度模式、重做角色等都集中在最下方的「設定」，請定期備份。'],
+quests:['任務','打卡位置就在這一頁：每個任務卡片下方按「完成」（壞習慣按「今天忍住了」）。每天至少打卡一個任務，全帳號的「連續打卡」天數就會增加。好習慣按「完成」；要戒除的壞習慣按「今天忍住了」，破戒了就按「破戒了」，會扣 HP 和 XP。難度決定 XP：簡單 15、中等 30、困難 50。每個任務有連續天數與目標天數，達標後可收編為暗影士兵（永久 XP 加成）。上方可切換「待辦事項」與「已完成」。忙碌時可按「低負擔：…」（只拿約 40% XP、沒有加成進度，但保住連續與紀錄）。誤按可在卡片按「撤銷」（只能撤銷最近一次）；編輯與刪除在卡片右下角的「⋯」選單。頻率可選「每天／指定星期／每週幾次」：休息日不會中斷連續、也不會被懲罰，想加練仍可直接完成。'],
 dun:['副本','「覺醒挑戰」是依你的覺醒測驗產生的專屬挑戰，每個都有明確目標。「傳送門」可自訂 1 到 3 個目標（指定任務的完成次數或連續天數），全部達成才通關，期限到沒達成就失敗。「試煉之塔」每層有一個累計完成次數目標，通關往上、失敗退一層。「首領討伐」用你的真實目標當首領，回報目前數值來推進。「支配者之觸」每天一次，讓一個「完成次數」目標的副本進度 +1。副本進度＝實際完成次數＋技能或屬性加成，兩者分開顯示，實際完成次數不會被加成影響。體能、名裝、暗影等加成會提高完成次數目標「額外 +1」的機率。通關可得魂晶、戰利品，並有機會收編暗影。'],
 army:['暗影','這裡有兩種暗影：達標的習慣會成為習慣暗影，每個永久加成 10% XP；通關副本或抽卡得到的暗影士兵放在「影子空間」。只有「出戰」的士兵提供加成，名額隨等級增加；名額滿時按「出戰」會與最弱的出戰者交換。每隻士兵有專長，對應的副本會有額外進度加成。'],
 vault:['寶庫','「魂晶」是通用貨幣，來自完成任務、通關副本與成就。「單抽」10 魂晶、「十連」90 魂晶，可抽到裝備、技能與暗影士兵，30 抽內必出傳說，十連至少一個稀有。裝備分武器、防具、飾品三格，每格自動採用最高稀有度的一件，提供 XP 加成。技能是被動效果，抽到就永久生效。「名裝」來自特定副本，最多裝備 2 把（雙持）。'],
@@ -374,7 +374,7 @@ function snap(h){S.undo=null;var j=JSON.stringify(S,function(k,v){return k==='av
 function undoLast(){var u=S.undo;if(!u||u.d!==T)return;var a=S.avatar;S=JSON.parse(u.j);S.avatar=a;S.undo=null;ovq=[];save();closeOv();toast('[系統] 已撤銷上一次打卡，獎勵與副本進度已一併回復')}
 function odone(o){return o.t==='c'?o.n+(o.bx||0)>=o.g:o.b>=o.g}
 function advance(h,extra){var c=[],m=0,b=0;S.dungeons.forEach(function(d){if(!d.objs)return;d.objs.forEach(function(o){if(o.h!==h.id&&o.h!=='*')return;
- if(o.t==='c'){o.n++;m++;if(extra&&o.n+(o.bx||0)<o.g&&Math.random()<bp(d)){o.bx=(o.bx||0)+1;b++}}else{if(o.l===T)return;o.run=(o.l&&(o.l===Y||covered(o.l)))?o.run+1:1;o.l=T;o.b=Math.max(o.b,o.run)}});
+ if(o.t==='c'){o.n++;m++;if(extra&&o.n+(o.bx||0)<o.g&&Math.random()<bp(d)){o.bx=(o.bx||0)+1;b++}}else{if(o.l===T)return;o.run=(o.l&&(o.l===Y||!brokeFrom(h,o.l)))?o.run+1:1;o.l=T;o.b=Math.max(o.b,o.run)}});
  if(d.objs.every(odone))c.push(d)});c.forEach(clearD);return{m:m,b:b}}
 function dStat2(d){var left=daysDiff(T,d.end)+1,nh=Math.max(1,S.habits.length);return{left:left,avg:0,need:0,ok:d.objs.every(function(o){return o.t==='c'?o.n+(o.bx||0)+left*(o.h==='*'?nh:1)>=o.g:(o.b>=o.g||((o.l===Y||o.l===T?o.run:0)+left>=o.g))})}}
 function touch(id){if(S.touch===T){toast('支配者之觸今日已使用',true);return}var d=S.dungeons.find(function(x){return x.id===id});if(!d||d.type==='boss')return;
@@ -388,18 +388,18 @@ function ocard(d){var left=Math.max(0,daysDiff(T,d.end)+1);
   return'<div style="margin:8px 0"><div class="row" style="margin:0 0 3px"><span style="color:'+(fin?'var(--green)':'var(--text)')+'">'+(fin?'✓ ':'')+nm+'：'+tx+'</span></div><div class="bar gd"><i style="width:'+Math.min(100,pv/o.g*100)+'%"></i></div></div>'}).join('')
  +'<div class="btns"><button class="b" onclick="askSkill(\'touch\',\''+d.id+'\')">支配者之觸'+(S.touch===T?'（已用）':'')+'</button><button class="b x" onclick="delD(\''+d.id+'\')">'+(confirmId===d.id?'確定放棄？':'放棄')+'</button></div></div>'}
 function complete(id,lite){var h=S.habits.find(function(x){return x.id===id});if(!h||done(h))return;snap(h);
- h.streak++;h.total++;h.last=T;if(lite)h.lite=(h.lite||0)+1;S.tc=(S.tc||0)+1;gStreak();S.stats[h.stat]++;
+ h.streak++;h.total++;h.last=T;if(lite)h.lite=(h.lite||0)+1;S.tc=(S.tc||0)+1;S.log=S.log||[];S.log.push({d:T,h:h.id,t:lite?'l':'f'});if(S.log.length>500)S.log=S.log.slice(-500);gStreak();S.stats[h.stat]++;
  var fx=!lite&&S.fast!==T;if(!lite)S.fast=T;if(fx){S.sage=S.sage||{d:0,lv:1};S.sage.d++}
  var base=lite?Math.round(h.xp*.4):h.xp,sg=fx?h.xp:0,g=gain(base+sg);
  S.gems+=lite?0:1+(sk('s1')?1:0)+(Math.random()<eff().gem?1:0);
  hit(h.xp);var a=advance(h,!lite);evoCheck();
  toast('[系統] '+(lite?'低負擔完成':h.type==='bad'?'成功忍住':'任務完成')+'：'+h.name+'｜實際完成 1 次｜XP：基礎 '+base+(sg?'＋大賢者 '+sg:'')+(g-base-sg>0?'＋加成 '+(g-base-sg):'')+' ＝ '+g+(lite?'（低負擔約 40%）':'')+(a.m?'｜副本進度 +'+(a.m+a.b)+'（任務 +'+a.m+(a.b?'、屬性加成 +'+a.b:'')+'）':''));
- if(S.tc===1)evt('first');
+ if(S.tc===1)evt('first',{},'<div class="sub" style="text-align:center">已解鎖「副本」分頁。</div>');else if(S.tc===3)toast('[系統] 已解鎖專屬技能、君主領域與潛影（狀態頁）');
  if(h.streak>=h.goal&&!h.shadow)ovq.push({k:'arise',id:h.id});
- var gd=S.habits.filter(function(x){return x.type==='good'});if(gd.length&&gd.every(done)&&S.dd!==T){S.dd=T;evt('daily')}
+ var gd=S.habits.filter(function(x){return x.type==='good'&&(dueToday(x)||done(x))});if(gd.length&&gd.every(done)&&S.dd!==T){S.dd=T;evt('daily')}
  save();render();flush()}
 function card(h){var p=Math.min(100,h.streak/h.goal*100),bad=h.type==='bad',d=done(h),cu=S.undo&&S.undo.h===h.id&&S.undo.d===T;
- return'<div class="q '+(bad?'bad ':'')+(d?'done':'')+'"><div class="qh"><div><span class="qn">'+esc(h.name)+'</span><span class="tag">'+STATS[h.stat]+' +1</span>'+(h.shadow?'<span class="tag" style="color:var(--violet);border-color:var(--violet)">暗影</span>':'')+'</div><div style="font-size:14px;color:var(--gold);white-space:nowrap">+'+h.xp+' XP</div></div>'
+ return'<div class="q '+(bad?'bad ':'')+(d?'done':'')+'"><div class="qh"><div><span class="qn">'+esc(h.name)+'</span><span class="tag">'+STATS[h.stat]+' +1</span><span class="tag">'+fqLabel(h)+'</span>'+(h.shadow?'<span class="tag" style="color:var(--violet);border-color:var(--violet)">暗影</span>':'')+'</div><div style="font-size:14px;color:var(--gold);white-space:nowrap">+'+h.xp+' XP</div></div>'
  +'<div class="sub">連續 '+h.streak+' ／ 目標 '+h.goal+' 天　累計 '+h.total+' 次'+(h.lite?'（含低負擔 '+h.lite+' 次）':'')+'</div><div class="bar '+(h.shadow?'gd':'')+'"><i style="width:'+p+'%"></i></div>'
  +'<div class="btns"><button class="b big1" '+(d?'disabled':'')+' onclick="complete(\''+h.id+'\')">'+(d?'今日已完成':bad?'今天忍住了':'完成')+'</button>'
  +(bad?'<button class="b r" onclick="slip(\''+h.id+'\')">破戒了</button>':'')
@@ -410,8 +410,52 @@ function openMenu(id){var h=S.habits.find(function(x){return x.id===id});if(!h)r
  $('#ov').innerHTML='<div class="ov"><div class="win"><div class="ttl">[ '+esc(h.name)+' ]</div><div class="btns" style="flex-direction:column"><button class="b big1" onclick="editH(\''+id+'\')">編輯任務</button>'+(cu?'<button class="b big1" onclick="undoLast()">撤銷本次打卡</button>':'')+'<button class="b r big1" onclick="delH(\''+id+'\')">'+(confirmId===id?'確定刪除？再按一次':'刪除任務')+'</button><button class="b x big1" style="margin-left:0" onclick="closeOv()">關閉</button></div></div></div>'}
 function delH(id){if(confirmId!==id){confirmId=id;openMenu(id);return}S.habits=S.habits.filter(function(x){return x.id!==id});confirmId=null;save();closeOv()}
 function editH(id){var h=S.habits.find(function(x){return x.id===id});if(!h)return;
- $('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl">[ 編輯任務 ]</div><label>名稱</label><input id="en" maxlength="30" value="'+esc(h.name)+'"><label>每次完成的 XP</label><input id="ex" type="number" min="1" value="'+h.xp+'"><label>目標天數</label><input id="eg" type="number" min="3" max="365" value="'+h.goal+'"><label>忙碌時的最低版本（選填）</label><input id="em" maxlength="20" value="'+esc(h.lt||'')+'" placeholder="例如：閱讀 5 分鐘"><div class="btns" style="justify-content:center;margin-top:14px"><button class="b g big1" style="flex:none;padding:0 24px" onclick="saveH(\''+id+'\')">儲存</button><button class="b x big1" style="margin-left:0;flex:none;padding:0 24px" onclick="closeOv()">取消</button></div></div></div>'}
-function saveH(id){var h=S.habits.find(function(x){return x.id===id}),n=$('#en').value.trim(),x=parseInt($('#ex').value),g=parseInt($('#eg').value);if(!h)return;if(!n||!(x>=1)||!(g>=3)){toast('請填寫名稱、XP 與目標天數（至少 3 天）',true);return}h.name=n;h.xp=x;h.goal=Math.min(365,g);h.lt=$('#em').value.trim()||undefined;save();closeOv()}
+ $('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl">[ 編輯任務 ]</div><label>名稱</label><input id="en" maxlength="30" value="'+esc(h.name)+'"><label>每次完成的 XP</label><input id="ex" type="number" min="1" value="'+h.xp+'"><label>目標天數</label><input id="eg" type="number" min="3" max="365" value="'+h.goal+'">'+fqUI(h.fq)+'<label>每次預估分鐘（選填）</label><input id="emn" type="number" min="1" value="'+(h.mn||'')+'"><label>忙碌時的最低版本（選填）</label><input id="em" maxlength="20" value="'+esc(h.lt||'')+'" placeholder="例如：閱讀 5 分鐘"><div class="btns" style="justify-content:center;margin-top:14px"><button class="b g big1" style="flex:none;padding:0 24px" onclick="saveH(\''+id+'\')">儲存</button><button class="b x big1" style="margin-left:0;flex:none;padding:0 24px" onclick="closeOv()">取消</button></div></div></div>'}
+function saveH(id){var h=S.habits.find(function(x){return x.id===id}),n=$('#en').value.trim(),x=parseInt($('#ex').value),g=parseInt($('#eg').value);if(!h)return;if(!n||!(x>=1)||!(g>=3)){toast('請填寫名稱、XP 與目標天數（至少 3 天）',true);return}var fq=fqRead();if(!fq)return;h.fq=fq;h.mn=parseInt($('#emn').value)||undefined;h.name=n;h.xp=x;h.goal=Math.min(365,g);h.lt=$('#em').value.trim()||undefined;save();closeOv()}
+function wd(d){return new Date(d+'T00:00:00').getDay()}
+function wkStart(d){var x=new Date(d+'T00:00:00');x.setDate(x.getDate()-((x.getDay()+6)%7));return ds(x)}
+function fqT(h){return h.fq&&h.fq.t||'d'}
+function weekCnt(h){var a=wkStart(T),b=addDays(a,6);return(S.log||[]).filter(function(x){return x.h===h.id&&x.d>=a&&x.d<=b}).length}
+function dueToday(h){var t=fqT(h);if(t==='d')return true;if(t==='w')return h.fq.d.indexOf(wd(T))>-1;return weekCnt(h)<h.fq.n}
+function brokeFrom(h,last){var t=fqT(h);if(t==='d')return!(last===Y||covered(last));
+ if(t==='w'){for(var d=addDays(last,1);d<=Y;d=addDays(d,1)){if(h.fq.d.indexOf(wd(d))>-1&&(S.sdDays||[]).indexOf(d)<0)return true}return false}
+ return daysDiff(last,Y)>Math.ceil(7/h.fq.n)+1&&!covered(last)}
+function missCnt(h,b){var t=fqT(h);if(t==='n')return 0;if(t==='d')return Math.max(0,daysDiff(b,Y)-sdCount(b,Y));var c=0;for(var d=addDays(b,1);d<=Y;d=addDays(d,1))if(h.fq.d.indexOf(wd(d))>-1&&(S.sdDays||[]).indexOf(d)<0)c++;return c}
+function fqLabel(h){var t=fqT(h);return t==='d'?'每天':t==='w'?'每週'+h.fq.d.slice().sort().map(function(d){return['日','一','二','三','四','五','六'][d]}).join(''):'每週 '+h.fq.n+' 次（本週 '+weekCnt(h)+'）'}
+function fqUI(f){f=f||{t:'d'};window._wd=(f.d||[]).slice();var dn=['日','一','二','三','四','五','六'];
+ return'<label>頻率（休息日不會中斷連續、也不會被懲罰）</label><select id="ff" onchange="ffChg()"><option value="d"'+(f.t==='d'?' selected':'')+'>每天</option><option value="w"'+(f.t==='w'?' selected':'')+'>指定星期</option><option value="n"'+(f.t==='n'?' selected':'')+'>每週幾次（彈性安排）</option></select>'
+ +'<div id="fw" style="display:'+(f.t==='w'?'flex':'none')+';gap:6px;flex-wrap:wrap;margin-top:6px">'+[1,2,3,4,5,6,0].map(function(d){return'<button class="b'+(window._wd.indexOf(d)>-1?' g':'')+'" id="wd'+d+'" onclick="tgW('+d+')" style="padding:0 12px">'+dn[d]+'</button>'}).join('')+'</div>'
+ +'<input id="fnn" type="number" min="1" max="7" value="'+(f.n||3)+'" style="margin-top:6px;display:'+(f.t==='n'?'block':'none')+'" placeholder="每週幾次">'}
+function ffChg(){var v=$('#ff').value;$('#fw').style.display=v==='w'?'flex':'none';$('#fnn').style.display=v==='n'?'block':'none'}
+function tgW(d){var i=window._wd.indexOf(d);if(i>-1)window._wd.splice(i,1);else window._wd.push(d);document.getElementById('wd'+d).className='b'+(window._wd.indexOf(d)>-1?' g':'')}
+function fqRead(){var v=$('#ff').value;if(v==='w'){if(!window._wd.length){toast('請至少選一天',true);return null}return{t:'w',d:window._wd.slice().sort()}}if(v==='n'){var n=parseInt($('#fnn').value);if(!(n>=1&&n<=7)){toast('每週次數需介於 1 到 7',true);return null}return{t:'n',n:n}}return{t:'d'}}
+function qfl(t){return function(x){return x.type===t&&(qf==='done'?done(x):(dueToday(x)&&!done(x)))}}
+function todoBox(){var due=S.habits.filter(function(h){return dueToday(h)&&!done(h)}),rest=S.habits.filter(function(h){return!dueToday(h)&&!done(h)});
+ return'<div class="win"><div class="ttl"><span>[ 今天還有 '+due.length+' 件事 ]</span><span class="cd"></span></div>'+(due.length?due.map(card).join(''):'<div class="empty">'+(S.habits.length?'今天的任務都完成了，辛苦了。':'還沒有任務，到「任務」分頁新增。')+'</div>')+(rest.length?'<div class="sub">今日休息：'+rest.map(function(h){return esc(h.name)}).join('、')+'</div>':'')+'</div>'}
+function wkTarget(h,a,b){var t=fqT(h);if(t==='n')return h.fq.n;var c=0;for(var d=(h.start&&h.start>a?h.start:a);d<=b;d=addDays(d,1)){if(t==='d'||h.fq.d.indexOf(wd(d))>-1)c++}return c}
+function weeklyBox(){var a=wkStart(T),la=addDays(a,-7),lb=addDays(a,-1),tot=0,got=0,mins=0,cnt=0,lt=0,lg=0,L=S.log||[];
+ var rows=S.habits.map(function(h){var c=L.filter(function(x){return x.h===h.id&&x.d>=a&&x.d<=T}),tg=Math.max(1,wkTarget(h,a,fqT(h)==='n'?addDays(a,6):T)),f=c.filter(function(x){return x.t==='f'}).length,l=c.length-f;tot+=tg;got+=Math.min(tg,c.length);cnt+=c.length;mins+=(h.mn||0)*f;
+  return'<div class="it"><span>'+esc(h.name)+'</span><span>'+c.length+' / '+tg+(l?'（含低負擔 '+l+'）':'')+'</span></div>'}).join('');
+ S.habits.forEach(function(h){var c=L.filter(function(x){return x.h===h.id&&x.d>=la&&x.d<=lb}).length,tg=wkTarget(h,la,lb);lt+=tg;lg+=Math.min(tg,c)});
+ var rate=tot?Math.round(got/tot*100):0,lr=lt?Math.round(lg/lt*100):null,big=function(v,t){return'<div><div class="lv" style="font-size:28px">'+v+'</div><div class="lvl">'+t+'</div></div>'};
+ return'<div class="win"><div class="ttl"><span>[ 本週回顧 ]</span><span>'+a.slice(5)+' 起</span></div><div class="stats" style="grid-template-columns:1fr 1fr 1fr;text-align:center">'+big(rate+'%','完成率'+(lr!==null?'（上週 '+lr+'%）':''))+big(cnt,'完成次數')+big(mins?mins+' 分':'—','預估投入')+'</div><div style="margin-top:8px">'+rows+'</div></div>'}
+function adv(){return S.showAll||(S.tc||0)>=3}
+function tabOk(t){if(t==='dun')return S.showAll||(S.tc||0)>=1;if(t==='army'||t==='vault')return S.showAll||(S.clr||0)>=1||S.lv>=3;return true}
+function lockHint(){return'<div class="win"><div class="sub" style="margin:0">更多功能會隨進度解鎖：完成第一個任務後解鎖「副本」；完成 3 個任務後解鎖專屬技能、君主領域與潛影；通關第一個副本或升到 Lv.3 後解鎖「暗影」與「寶庫」。想一次全部看，到下方「設定」打開「顯示全部進階功能」。</div></div>'}
+function toggleAdv(){S.showAll=!S.showAll;save();render()}
+function bkTxt(){if(!S.bk)return{t:'尚未備份',c:'var(--red)'};var d=Math.floor((Date.now()-S.bk)/864e5);return{t:d<=0?'今天已備份':d+' 天前備份',c:d>7?'var(--red)':'var(--green)'}}
+function settingsPanel(){var b=bkTxt();return'<div class="win"><div class="ttl"><span>[ 設定與備份 ]</span><span style="color:'+b.c+'">'+b.t+'</span></div><div class="btns"><button class="b big1" onclick="openSettings()">開啟設定</button><button class="b big1" onclick="exportData()">立即備份</button></div></div>'}
+function stg(f){window[f]();openSettings()}
+function srow(l,v,btns){return'<div class="q"><div class="qn">'+l+'</div><div class="sub">'+v+'</div><div class="btns">'+btns+'</div></div>'}
+function openSettings(){var b=bkTxt(),bd=S.bk?new Date(S.bk).toLocaleDateString('zh-TW'):'尚未備份';
+ $('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl"><span>[ 設定 ]</span><span style="color:'+b.c+'">'+b.t+'</span></div>'
+ +srow('難度模式',S.hard?'目前：困難（漏做自動受罰）':'目前：一般（漏做只中斷連續）','<button class="b big1" onclick="stg(\'toggleHard\')">切換</button>')
+ +srow('主題',S.theme==='b'?'目前：藍紫':'目前：橘黑','<button class="b big1" onclick="stg(\'toggleTheme\')">切換</button>')
+ +srow('進階功能',S.showAll?'目前：顯示全部':'目前：依進度逐步解鎖','<button class="b big1" onclick="stg(\'toggleAdv\')">切換</button>')
+ +srow('覺醒測驗與序章','重新產生專屬任務與挑戰，或重看開場漫畫。','<button class="b big1" onclick="startQuiz()">重做覺醒測驗</button><button class="b big1" onclick="showPro(0)">重看序章</button>')
+ +srow('備份','最近一次匯出：'+bd+'。資料只存在這支手機這個 App 的瀏覽器儲存空間，沒有上傳到任何伺服器。清除網站資料、刪掉主畫面圖示或換手機都會遺失。換手機時：舊手機「匯出備份」→ 傳給自己 → 新手機「匯入備份」。','<button class="b big1" onclick="exportData()">匯出備份</button><button class="b big1" onclick="importData()">匯入備份</button>')
+ +srow('重做角色','清除所有進度並重新開始（建議先匯出備份）。','<button class="b r big1" onclick="askReset()">重做角色</button>')
+ +'<div class="btns" style="justify-content:center"><button class="b x big1" style="margin-left:0" onclick="closeOv()">關閉</button></div></div></div>'}
 function toast(m,bad){var d=document.createElement('div');d.textContent=m;if(bad)d.className='bad';$('#toast').appendChild(d);setTimeout(function(){d.remove()},2600)}
 function $(s){return document.querySelector(s)}
 function shadows(){return S.habits.filter(function(h){return h.shadow})}
@@ -436,10 +480,10 @@ function flush0(){if($('#ov').innerHTML||!ovq.length)return;var o=ovq.shift(),h;
 function arise(id){var h=S.habits.find(function(x){return x.id===id});h.shadow=true;S.gems+=10;var g=gain(h.goal*5);
  toast('[系統] 暗影收編：'+h.name+'　+'+g+' XP');save();closeOv();render()}
 function closeOv(){$('#ov').innerHTML='';render();flush()}
-function openAdd(){$('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl">[ 新增任務 ]</div><label>任務名稱</label><input id="fn" maxlength="30" placeholder="例如：每天運動 30 分鐘"><label>類型</label><div class="seg"><button class="b sel" id="tg" onclick="setT(\'good\')">好習慣（養成）</button><button class="b" id="tb" onclick="setT(\'bad\')">壞習慣（戒除）</button></div><label>強化屬性</label><select id="fs">'+Object.keys(STATS).map(function(k){return'<option value="'+k+'">'+STATS[k]+'</option>'}).join('')+'</select><label>難度（決定 XP）</label><select id="fx"><option value="15">簡單・15 XP</option><option value="30" selected>中等・30 XP</option><option value="50">困難・50 XP</option></select><label>目標天數（連續達成後可收為暗影）</label><input id="fg" type="number" min="3" max="365" value="21"><label>忙碌時的最低版本（選填，例如：閱讀 5 分鐘）</label><input id="fm" maxlength="20"><div class="btns" style="justify-content:center;margin-top:16px"><button class="b" onclick="addH()">建立任務</button><button class="b x" style="margin-left:0" onclick="closeOv()">取消</button></div></div></div>';window._t='good'}
+function openAdd(){$('#ov').innerHTML='<div class="ov"><div class="win" style="max-height:92vh;overflow:auto"><div class="ttl">[ 新增任務 ]</div><label>任務名稱</label><input id="fn" maxlength="30" placeholder="例如：每天運動 30 分鐘"><label>類型</label><div class="seg"><button class="b sel" id="tg" onclick="setT(\'good\')">好習慣（養成）</button><button class="b" id="tb" onclick="setT(\'bad\')">壞習慣（戒除）</button></div><label>強化屬性</label><select id="fs">'+Object.keys(STATS).map(function(k){return'<option value="'+k+'">'+STATS[k]+'</option>'}).join('')+'</select><label>難度（決定 XP）</label><select id="fx"><option value="15">簡單・15 XP</option><option value="30" selected>中等・30 XP</option><option value="50">困難・50 XP</option></select><label>目標天數（連續達成後可收為暗影）</label><input id="fg" type="number" min="3" max="365" value="21">'+fqUI()+'<label>忙碌時的最低版本（選填，例如：閱讀 5 分鐘）</label><input id="fm" maxlength="20"><label>每次預估分鐘（選填，用於每週回顧）</label><input id="fmn" type="number" min="1"><div class="btns" style="justify-content:center;margin-top:16px"><button class="b" onclick="addH()">建立任務</button><button class="b x" style="margin-left:0" onclick="closeOv()">取消</button></div></div></div>';window._t='good'}
 function setT(t){window._t=t;$('#tg').className='b'+(t==='good'?' sel':'');$('#tb').className='b'+(t==='bad'?' sel':'')}
 function addH(){var n=$('#fn').value.trim();if(!n){toast('請輸入任務名稱',true);return}
- S.habits.push({id:'h'+Date.now(),name:n,type:window._t,stat:$('#fs').value,xp:+$('#fx').value,goal:Math.max(3,Math.min(365,+$('#fg').value||21)),streak:0,total:0,last:null,shadow:false,start:T,pen:Y,lt:$('#fm').value.trim()||undefined});
+ var fq=fqRead();if(!fq)return;S.habits.push({id:'h'+Date.now(),fq:fq,mn:parseInt($('#fmn').value)||undefined,name:n,type:window._t,stat:$('#fs').value,xp:+$('#fx').value,goal:Math.max(3,Math.min(365,+$('#fg').value||21)),streak:0,total:0,last:null,shadow:false,start:T,pen:Y,lt:$('#fm').value.trim()||undefined});
  save();closeOv()}
 function starter(){[['早睡（23:00 前就寢）','good','VIT',20,21],['運動 30 分鐘','good','STR',30,21],['閱讀 20 分鐘','good','INT',20,21],['冥想 10 分鐘','good','SEN',10,14],['整理今日待辦','good','AGI',10,14],['不滑短影音','bad','SEN',30,14]].forEach(function(a,i){S.habits.push({id:'h'+Date.now()+i,name:a[0],type:a[1],stat:a[2],xp:a[3],goal:a[4],streak:0,total:0,last:null,shadow:false})});save();render()}
 function addR(){var n=$('#rn').value.trim(),l=+$('#rl').value;if(!n||!l){toast('請填寫獎勵與所需等級',true);return}
@@ -448,20 +492,20 @@ function claim(id){var r=S.rewards.find(function(x){return x.id===id});r.claimed
 function delR(id){S.rewards=S.rewards.filter(function(x){return x.id!==id});save();render()}
 function setName(v){S.name=v.slice(0,12)||'玩家';save()}
 function render(){
- var tabs=[['status','狀態'],['quests','任務'],['dun','副本'],['army','暗影'],['vault','寶庫'],['shop','成就商店']];
+ var tabs=[['status','狀態'],['quests','任務'],['dun','副本'],['army','暗影'],['vault','寶庫'],['shop','成就商店']];if(!tabOk(tab))tab='status';tabs=tabs.filter(function(t){return tabOk(t[0])});
  $('#tabs').innerHTML=tabs.map(function(t){return'<button class="'+(tab===t[0]?'on':'')+'" onclick="go(\''+t[0]+'\')">'+t[1]+'</button>'}).join('');
  var h='',H=S.habits,dn=H.filter(done).length;h+=banner()+helpBox();
  if(tab==='status'){
-  h+='<div class="win"><div class="ttl"><span>[ 狀態視窗 ]</span><span>'+T+'</span></div><div class="hero"><div onclick="openAv()" style="cursor:pointer">'+avatar(72)+'<input type="file" accept="image/*" id="avf" style="display:none" onchange="upAv(this)"></div><div><div class="lv">'+S.lv+'</div><div class="lvl">等級</div></div><div style="flex:1"><input class="nm" value="'+esc(S.name)+'" onchange="setName(this.value)" aria-label="玩家名稱"><div class="rank">階級 '+rankOf(S.lv)+'</div></div></div><div class="row"><span>經驗值</span><span>'+S.xp+' ／ '+need(S.lv)+'</span></div><div class="bar"><i style="width:'+S.xp/need(S.lv)*100+'%"></i></div><div class="row"><span>生命值</span><span>'+S.hp+' ／ 100</span></div><div class="bar hp"><i style="width:'+S.hp+'%"></i></div></div>';
+  h+=todoBox();h+='<div class="win"><div class="ttl"><span>[ 狀態視窗 ]</span><span>'+T+'</span></div><div class="hero"><div onclick="openAv()" style="cursor:pointer">'+avatar(72)+'<input type="file" accept="image/*" id="avf" style="display:none" onchange="upAv(this)"></div><div><div class="lv">'+S.lv+'</div><div class="lvl">等級</div></div><div style="flex:1"><input class="nm" value="'+esc(S.name)+'" onchange="setName(this.value)" aria-label="玩家名稱"><div class="rank">階級 '+rankOf(S.lv)+'</div></div></div><div class="row"><span>經驗值</span><span>'+S.xp+' ／ '+need(S.lv)+'</span></div><div class="bar"><i style="width:'+S.xp/need(S.lv)*100+'%"></i></div><div class="row"><span>生命值</span><span>'+S.hp+' ／ 100</span></div><div class="bar hp"><i style="width:'+S.hp+'%"></i></div></div>';
   h+='<div class="win"><div class="ttl"><span>[ 能力值 ]</span><span style="color:var(--gold)">'+(S.pts?'可分配 '+S.pts+' 點':'')+'</span></div><div class="stats">'+Object.keys(STATS).map(function(k){return'<div class="st"><img class="si" src="img/O0'+SI5[k]+'.jpg" alt="">'+STATS[k]+(S.pts?' <button class="b" style="padding:0 10px" onclick="alloc(\''+k+'\')">＋</button>':'')+'<b>'+S.stats[k]+'</b></div>'}).join('')+'</div><div class="sub" style="margin:10px 0 0">'+effTxt()+'</div></div>';
   h+='<div class="win"><div class="ttl"><span>[ 今日進度 ]</span><span class="cd"></span></div><div class="row" style="margin-top:0"><span>已完成任務</span><span>'+dn+' ／ '+H.length+'</span></div><div class="bar"><i style="width:'+(H.length?dn/H.length*100:0)+'%"></i></div><div class="sub">連續打卡 '+gsNow()+' 天（最高 '+(S.gsBest||0)+'）　暗影士兵 '+shadows().length+' 名，XP 加成 ×'+mult().toFixed(1)+'　魂晶 '+S.gems+'</div></div>';
-  h+=domBox();h+=sneakBox();h+=sageBox();h+=modeBox()}
+  if(adv()){h+=domBox();h+=sneakBox();h+=sageBox()}else h+=lockHint();if(S.tc>=1)h+=weeklyBox();h+=settingsPanel()}
  if(tab==='quests'){
   h+=cdBox();h+=qseg();h+='<button class="b add" onclick="openAdd()">＋ 新增任務</button>';
   if(!H.length)h+='<div class="win empty">還沒有任務。新增你想養成或戒除的習慣，或先載入範例。<div class="btns" style="justify-content:center"><button class="b" onclick="starter()">載入範例任務</button></div></div>';
-  var g=H.filter(function(x){return x.type==='good'&&(qf==='done')===done(x)}),b=H.filter(function(x){return x.type==='bad'&&(qf==='done')===done(x)});if(H.length&&!g.length&&!b.length)h+='<div class="empty">'+(qf==='done'?'今天還沒有完成的任務':'今天的任務全部完成了')+'</div>';
+  var g=H.filter(qfl('good')),b=H.filter(qfl('bad'));if(H.length&&!g.length&&!b.length)h+='<div class="empty">'+(qf==='done'?'今天還沒有完成的任務':'今天的任務全部完成了')+'</div>';
   if(g.length)h+='<div class="win"><div class="ttl">[ 每日任務 ]</div>'+g.map(card).join('')+'</div>';
-  if(b.length)h+='<div class="win" style="border-color:#7a2442"><div class="ttl" style="color:var(--red)">[ 戒除目標：敵人 ]</div>'+b.map(card).join('')+'</div>'}
+  if(b.length)h+='<div class="win" style="border-color:#7a2442"><div class="ttl" style="color:var(--red)">[ 戒除目標：敵人 ]</div>'+b.map(card).join('')+'</div>';var rs=qf==='todo'?H.filter(function(x){return!dueToday(x)&&!done(x)}):[];if(rs.length)h+='<div class="win"><div class="ttl">[ 今日休息 ]</div><div class="sub" style="margin:0 0 8px">依你設定的頻率，今天不用做；想加練也可以直接完成。</div>'+rs.map(card).join('')+'</div>'}
  if(tab==='army'){
   var sh=shadows();
   h+='<div class="win arise" style="border-color:var(--violet)"><div class="ttl" style="color:var(--violet)">[ 暗影軍團 ]</div><div class="sub" style="margin:0">你是君主，每個達成目標的習慣都是你的暗影士兵。人數越多，所有 XP 加成越高。目前 ×'+mult().toFixed(1)+'。</div></div>';
